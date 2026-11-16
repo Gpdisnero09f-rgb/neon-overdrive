@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON OVERDRIVE: Cyber Runner & Tycoon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #05050a;
+            color: #f8fafc;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .font-display {
+            font-family: 'Orbitron', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* Efectos Neón Arcade */
+        .neon-text-cyan {
+            text-shadow: 0 0 8px rgba(6, 182, 212, 0.8), 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .neon-text-pink {
+            text-shadow: 0 0 8px rgba(236, 72, 153, 0.8), 0 0 20px rgba(236, 72, 153, 0.5);
+        }
+        .neon-text-gold {
+            text-shadow: 0 0 8px rgba(250, 204, 21, 0.8), 0 0 18px rgba(250, 204, 21, 0.4);
+        }
+        .neon-box {
+            background: rgba(10, 12, 24, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.15), inset 0 0 15px rgba(6, 182, 212, 0.05);
+        }
+        .btn-arcade {
+            position: relative;
+            transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+            overflow: hidden;
+        }
+        .btn-arcade:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.02);
+            filter: brightness(1.12);
+        }
+        .btn-arcade:active:not(:disabled) {
+            transform: translateY(1px) scale(0.98);
+        }
+        .btn-arcade:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        /* Scrollbar personalizada para modales */
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(6, 182, 212, 0.5);
+            border-radius: 999px;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(6, 182, 212, 0.8); }
+        }
+        .animate-glow {
+            animation: pulseGlow 2.5s infinite;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex flex-col items-center justify-center">
+
+    <!-- Lienzo Principal del Juego -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Contenedor de Notificaciones Toast Flotantes -->
+    <div id="toast-container" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none w-full max-w-sm px-4"></div>
+
+    <!-- HUD SUPERIOR (Visible siempre) -->
+    <header class="fixed top-0 left-0 right-0 z-30 px-3 sm:px-6 py-2.5 flex items-center justify-between pointer-events-none">
+        <!-- Divisas del Jugador (Coins y Gemas) -->
+        <div class="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+            <!-- Monedas (Coins) -->
+            <button onclick="openModal('bank')" class="flex items-center gap-2 bg-slate-950/85 border border-amber-400/50 rounded-full px-3 py-1 shadow-lg hover:border-amber-300 transition">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-[10px] font-black text-slate-950 shadow">₵</span>
+                <span id="hud-coins" class="font-display font-bold text-xs sm:text-sm text-amber-300">500</span>
+                <span class="w-4 h-4 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs font-bold">+</span>
+            </button>
+
+            <!-- Gemas Premium (Gems) -->
+            <button onclick="openModal('bank')" class="flex items-center gap-2 bg-slate-950/85 border border-fuchsia-500/50 rounded-full px-3 py-1 shadow-lg hover:border-fuchsia-400 transition">
+                <span class="text-fuchsia-400 text-xs">💎</span>
+                <span id="hud-gems" class="font-display font-bold text-xs sm:text-sm text-fuchsia-300">25</span>
+                <span class="w-4 h-4 rounded-full bg-fuchsia-500/20 text-fuchsia-300 flex items-center justify-center text-xs font-bold">+</span>
+            </button>
+
+            <!-- Generador Pasivo Tycoon (Visible en Menú) -->
+            <button id="tycoon-collect-btn" onclick="collectTycoonIncome()" class="hidden sm:flex items-center gap-1.5 bg-emerald-950/90 border border-emerald-400/50 rounded-full px-3 py-1 text-xs font-bold text-emerald-300 hover:bg-emerald-900/90 transition shadow-lg">
+                <span>⚡ Nodo Tycoon:</span>
+                <span id="hud-tycoon-pending">+0 ₵</span>
+            </button>
+        </div>
+
+        <!-- Puntuación en Partida (Visible solo jugando) -->
+        <div id="hud-gameplay-stats" class="hidden flex items-center gap-3 sm:gap-5 bg-slate-950/80 border border-cyan-500/30 rounded-full px-4 py-1">
+            <div class="text-center">
+                <span class="text-[10px] uppercase text-slate-400 block leading-none">Puntos</span>
+                <span id="hud-score" class="font-display font-black text-sm sm:text-base text-cyan-300">0</span>
+            </div>
+            <div class="h-5 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-[10px] uppercase text-slate-400 block leading-none">Combo</span>
+                <span id="hud-combo" class="font-display font-black text-sm sm:text-base text-pink-400">x1</span>
+            </div>
+        </div>
+
+        <!-- Controles Rápidos (Audio / Pausa) -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button onclick="toggleMute()" id="btn-mute" title="Silenciar / Activar Audio" class="w-9 h-9 rounded-full bg-slate-950/85 border border-cyan-500/40 flex items-center justify-center text-cyan-300 hover:bg-slate-900 transition">
+                🔊
+            </button>
+            <button onclick="togglePause()" id="btn-pause" class="hidden w-9 h-9 rounded-full bg-slate-950/85 border border-pink-500/40 flex items-center justify-center text-pink-300 hover:bg-slate-900 transition font-bold text-xs">
+                ❚❚
+            </button>
+        </div>
+    </header>
+
+    <!-- PANTALLA DE INICIO / MENÚ PRINCIPAL -->
+    <section id="screen-menu" class="fixed inset-0 z-20 flex flex-col items-center justify-between py-16 px-4 bg-gradient-to-b from-slate-950/50 via-transparent to-slate-950/85 pointer-events-none">
+        
+        <!-- Título y Récord -->
+        <div class="text-center mt-4 sm:mt-6 pointer-events-auto">
+            <div class="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold tracking-widest uppercase mb-2">
+                <span>⚡ Edición Arcade Monetizada</span>
+                <span>•</span>
+                <span id="menu-vip-badge" class="text-amber-300">Cuenta Estándar</span>
+            </div>
+            <h1 class="font-display font-black text-4xl sm:text-6xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-pink-500 neon-text-cyan">
+                NEON OVERDRIVE
+            </h1>
+            <p class="font-display text-xs sm:text-sm tracking-[0.25em] text-pink-400 uppercase mt-1 neon-text-pink">
+                Cyber Runner & Tycoon
+            </p>
+            <div class="mt-3 inline-flex items-center gap-4 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-1.5 text-xs sm:text-sm">
+                <span class="text-slate-400">Récord Mundial Personal: <strong id="menu-highscore" class="font-display text-cyan-300">0</strong></span>
+                <span class="text-slate-700">|</span>
+                <span class="text-slate-400">Nave: <strong id="menu-active-skin" class="text-pink-400">Interceptor V1</strong></span>
+            </div>
+        </div>
+
+        <!-- Botón Central JUGAR y Anuncio Recompensado Rápido -->
+        <div class="flex flex-col items-center gap-3 pointer-events-auto my-auto">
+            <button onclick="startGame()" class="btn-arcade animate-glow px-10 sm:px-14 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-pink-600 text-white font-display font-black text-xl sm:text-2xl tracking-widest uppercase border-2 border-white/30 shadow-2xl">
+                ▶ JUGAR AHORA
+            </button>
+
+            <div class="flex flex-wrap items-center justify-center gap-2.5 mt-1">
+                <button onclick="watchRewardedAd('coins')" class="btn-arcade flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/60 text-amber-300 text-xs sm:text-sm font-bold shadow-lg">
+                    <span>🎬 Ver Anuncio:</span>
+                    <span class="text-white">+250 ₵ Gratis</span>
+                </button>
+                <button onclick="collectTycoonIncome()" class="sm:hidden btn-arcade flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 text-xs font-bold">
+                    <span>⚡ Tycoon:</span>
+                    <span id="mobile-tycoon-pending">+0 ₵</span>
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-400 text-center max-w-xs">
+                PC: <span class="text-cyan-300 font-bold">← → / A D</span> para cambiar carril • Móvil: <span class="text-pink-300 font-bold">Desliza o toca</span> los lados
+            </p>
+        </div>
+
+        <!-- Barra Inferior de Navegación (Tienda, Mejoras, Pase de Batalla, Misiones, Banco) -->
+        <nav class="w-full max-w-3xl grid grid-cols-5 gap-1.5 sm:gap-3 pointer-events-auto">
+            <button onclick="openModal('garage')" class="btn-arcade neon-box rounded-xl p-2 sm:p-3 flex flex-col items-center justify-center gap-1 hover:border-cyan-400">
+                <span class="text-lg sm:text-2xl">🚀</span>
+                <span class="font-display font-bold text-[10px] sm:text-xs text-cyan-300 tracking-wide">SKINS</span>
+            </button>
+            <button onclick="openModal('upgrades')" class="btn-arcade neon-box rounded-xl p-2 sm:p-3 flex flex-col items-center justify-center gap-1 hover:border-emerald-400">
+                <span class="text-lg sm:text-2xl">⚡</span>
+                <span class="font-display font-bold text-[10px] sm:text-xs text-emerald-300 tracking-wide">MEJORAS</span>
+            </button>
+            <button onclick="openModal('battlepass')" class="btn-arcade neon-box rounded-xl p-2 sm:p-3 flex flex-col items-center justify-center gap-1 border-pink-500/50 hover:border-pink-400 relative">
+                <span class="absolute -top-1.5 -right-1 px-1.5 py-0.2 bg-pink-600 text-[9px] font-black rounded-full text-white">PRO</span>
+                <span class="text-lg sm:text-2xl">🏆</span>
+                <span class="font-display font-bold text-[10px] sm:text-xs text-pink-300 tracking-wide">PASE</span>
+            </button>
+            <button onclick="openModal('missions')" class="btn-arcade neon-box rounded-xl p-2 sm:p-3 flex flex-col items-center justify-center gap-1 hover:border-amber-400 relative">
+                <span id="mission-dot" class="hidden absolute top-1.5 right-2 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                <span class="text-lg sm:text-2xl">📋</span>
+                <span class="font-display font-bold text-[10px] sm:text-xs text-amber-300 tracking-wide">MISIONES</span>
+            </button>
+            <button onclick="openModal('bank')" class="btn-arcade neon-box rounded-xl p-2 sm:p-3 flex flex-col items-center justify-center gap-1 border-fuchsia-500/50 hover:border-fuchsia-400">
+                <span class="text-lg sm:text-2xl">💎</span>
+                <span class="font-display font-bold text-[10px] sm:text-xs text-fuchsia-300 tracking-wide">TIENDA</span>
+            </button>
+        </nav>
+    </section>
+
+    <!-- CONTROLES TÁCTILES INVISIBLES / VISUALES EN PARTIDA PARA MÓVILES -->
+    <div id="touch-controls" class="hidden fixed inset-x-0 bottom-4 z-20 px-6 flex justify-between pointer-events-none sm:hidden">
+        <button onpointerdown="moveLane(-1)" class="pointer-events-auto w-16 h-16 rounded-2xl bg-cyan-500/15 border border-cyan-400/40 backdrop-blur-sm flex items-center justify-center text-2xl text-cyan-300 active:bg-cyan-500/40">
+            ◀
+        </button>
+        <button onpointerdown="moveLane(1)" class="pointer-events-auto w-16 h-16 rounded-2xl bg-pink-500/15 border border-pink-400/40 backdrop-blur-sm flex items-center justify-center text-2xl text-pink-300 active:bg-pink-500/40">
+            ▶
+        </button>
+    </div>
+
+    <!-- PANTALLA DE PAUSA -->
+    <div id="screen-pause" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="neon-box rounded-2xl p-6 sm:p-8 max-w-sm w-full text-center flex flex-col gap-4">
+            <h2 class="font-display font-black text-2xl text-cyan-300 tracking-wider">JUEGO EN PAUSA</h2>
+            <p class="text-sm text-slate-400">Tu progreso de esta carrera está seguro.</p>
+            <button onclick="togglePause()" class="btn-arcade w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 font-display font-bold text-sm text-white tracking-wider">
+                ▶ CONTINUAR
+            </button>
+            <button onclick="quitToMenu()" class="btn-arcade w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-display font-bold text-sm text-slate-300 tracking-wider">
+                🏠 VOLVER AL MENÚ
+            </button>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE GAME OVER (CON REVIVIR POR ANUNCIO Y COMPARTIR) -->
+    <section id="screen-gameover" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="neon-box rounded-3xl p-6 sm:p-8 max-w-md w-full text-center flex flex-col gap-4 border-pink-500/50">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-widest text-pink-400">¡Sistema Sobrecargado!</span>
+                <h2 class="font-display font-black text-3xl sm:text-4xl text-white neon-text-pink mt-1">FIN DE CARRERA</h2>
+            </div>
+
+            <!-- Resumen de la Partida -->
+            <div class="grid grid-cols-2 gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl p-4">
+                <div>
+                    <span class="text-xs text-slate-400 block">Puntuación Final</span>
+                    <span id="go-score" class="font-display font-black text-2xl text-cyan-300">0</span>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-400 block">Monedas Ganadas</span>
+                    <span id="go-coins" class="font-display font-black text-2xl text-amber-300">+0 ₵</span>
+                </div>
+                <div class="col-span-2 pt-2 border-t border-slate-800/80 flex justify-between text-xs">
+                    <span class="text-slate-400">Récord Personal: <strong id="go-highscore" class="text-white">0</strong></span>
+                    <span class="text-emerald-400">XP Pase: <strong id="go-xp">+0 XP</strong></span>
+                </div>
+            </div>
+
+            <!-- Botón de Monetización: Revivir viendo Anuncio Recompensado -->
+            <button id="btn-revive-ad" onclick="watchRewardedAd('revive')" class="btn-arcade w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-display font-black text-sm tracking-wide shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2">
+                <span>🎬 REVIVIR AHORA (ANUNCIO GRATIS)</span>
+            </button>
+
+            <!-- Botón Duplicar Monedas con Anuncio -->
+            <button id="btn-double-coins-ad" onclick="watchRewardedAd('double_coins')" class="btn-arcade w-full py-2.5 px-4 rounded-xl bg-fuchsia-600/25 hover:bg-fuchsia-600/40 border border-fuchsia-400/60 text-fuchsia-200 font-bold text-xs tracking-wide flex items-center justify-center gap-2">
+                <span>📺 Duplicar Monedas de esta Partida (+100%)</span>
+            </button>
+
+            <!-- Acciones Estándar -->
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+                <button onclick="shareScore()" class="btn-arcade py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-500/30 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5">
+                    <span>📤 Compartir Récord</span>
+                </button>
+                <button onclick="startGame()" class="btn-arcade py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-display font-bold text-xs tracking-wider">
+                    ↻ REINTENTAR
+                </button>
+            </div>
+            <button onclick="quitToMenu()" class="text-xs text-slate-400 hover:text-white underline mt-1">
+                Volver al Menú Principal y Tienda
+            </button>
+        </div>
+    </section>
+
+    <!-- MODAL MULTIPROPÓSITO (SKINS, MEJORAS, PASE DE BATALLA, MISIONES, BANCO/FACTURACIÓN) -->
+    <div id="modal-backdrop" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+        <div class="neon-box rounded-3xl w-full max-w-2xl max-h-[88vh] flex flex-col overflow-hidden border-cyan-400/40">
+            <!-- Cabecera del Modal -->
+            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                <div class="flex items-center gap-2.5">
+                    <span id="modal-icon" class="text-2xl">🚀</span>
+                    <div>
+                        <h3 id="modal-title" class="font-display font-black text-lg sm:text-xl text-white tracking-wide">GARAJE DE NAVES</h3>
+                        <p id="modal-subtitle" class="text-xs text-slate-400">Personaliza tu nave y multiplica tu estilo</p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-pink-600 text-white flex items-center justify-center font-bold transition">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Contenido Dinámico del Modal -->
+            <div id="modal-body" class="p-5 overflow-y-auto custom-scroll flex-1 flex flex-col gap-4">
+                <!-- Se rellena dinámicamente con JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY DE ANUNCIO RECOMPENSADO SIMULADO (MONETIZACIÓN) -->
+    <div id="ad-overlay" class="hidden fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 text-center">
+        <div class="max-w-md w-full neon-box rounded-2xl p-6 border-amber-400/50 flex flex-col items-center gap-4">
+            <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-widest">
+                Patrocinador • Anuncio Recompensado
+            </span>
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-pink-600 flex items-center justify-center text-3xl shadow-lg animate-bounce">
+                ⚡
+            </div>
+            <h3 class="font-display font-black text-xl text-white">CYBERTECH ENERGY DRINK</h3>
+            <p class="text-xs text-slate-300">¡Recarga tus reflejos al 200% en cada carrera nocturna de Neo-City!</p>
+            
+            <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mt-2">
+                <div id="ad-progress-bar" class="h-full bg-gradient-to-r from-amber-400 to-pink-500 w-0 transition-all duration-200"></div>
+            </div>
+            <p id="ad-timer-text" class="font-display text-xs text-amber-300">Recompensa disponible en 3s...</p>
+        </div>
+    </div>
+
+    <!-- OVERLAY DE PASARELA DE FACTURACIÓN SIMULADA (CHECKOUT IN-APP) -->
+    <div id="checkout-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="neon-box rounded-2xl p-6 max-w-sm w-full border-fuchsia-500/60 flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <span class="font-display font-bold text-sm text-fuchsia-300">💳 NEON PAY • CHECKOUT</span>
+                <button onclick="closeCheckout()" class="text-slate-400 hover:text-white text-sm">✕</button>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <p class="text-xs text-slate-400">Artículo seleccionado:</p>
+                <p id="checkout-item-name" class="font-display font-bold text-base text-white mt-0.5">Paquete 500 Gemas</p>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-800/80">
+                    <span class="text-xs text-slate-400">Total a facturar (Simulado):</span>
+                    <span id="checkout-item-price" class="font-display font-black text-lg text-emerald-400">$4.99 USD</span>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-400 text-center">
+                Entorno de demostración comercial: No se realizará ningún cargo real a tu tarjeta.
+            </p>
+            <button id="btn-confirm-purchase" onclick="confirmSimulatedPurchase()" class="btn-arcade w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-display font-black text-sm tracking-wider shadow-lg">
+                ✓ CONFIRMAR COMPRA INSTANTÁNEA
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. MOTOR DE AUDIO SINTETIZADO (WEB AUDIO API - CERO ARCHIVOS EXTERNOS)
+        // =========================================================================
+        const SoundFX = {
+            ctx: null,
+            muted: false,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(freq, type, duration, vol = 0.12, slideTo = null) {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                if (slideTo) {
+                    osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+                }
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+            move() {
+                this.playTone(320, 'triangle', 0.09, 0.1, 520);
+            },
+            coin(combo = 1) {
+                const base = 600 + Math.min(combo * 35, 600);
+                this.playTone(base, 'sine', 0.12, 0.12, base * 1.4);
+            },
+            powerup() {
+                this.playTone(440, 'sawtooth', 0.25, 0.12, 880);
+                setTimeout(() => this.playTone(660, 'sine', 0.25, 0.12, 1320), 90);
+            },
+            crash() {
+                this.playTone(160, 'sawtooth', 0.45, 0.22, 35);
+                this.playTone(90, 'square', 0.4, 0.18, 25);
+            },
+            shieldBreak() {
+                this.playTone(500, 'square', 0.25, 0.15, 140);
+            },
+            buy() {
+                this.playTone(523.25, 'sine', 0.1, 0.15);
+                setTimeout(() => this.playTone(659.25, 'sine', 0.1, 0.15), 80);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.2, 0.18), 160);
+            }
+        };
+
+        function toggleMute() {
+            SoundFX.muted = !SoundFX.muted;
+            document.getElementById('btn-mute').textContent = SoundFX.muted ? '🔇' : '🔊';
+            showToast(SoundFX.muted ? 'Audio silenciado' : 'Audio activado', 'info');
+        }
+
+        // =========================================================================
+        // 2. DATOS DE ECONOMÍA, MONETIZACIÓN Y ESTADO GUARDADO (LOCALSTORAGE)
+        // =========================================================================
+        const SKINS_CATALOG = [
+            { id: 'v1', name: 'Interceptor V1', primary: '#06b6d4', glow: '#22d3ee', trail: 'rgba(6,182,212,0.5)', currency: 'coins', price: 0, perk: 'Estándar equilibrado' },
+            { id: 'crimson', name: 'Furia Carmesí', primary: '#f43f5e', glow: '#fb7185', trail: 'rgba(244,63,94,0.5)', currency: 'coins', price: 600, perk: '+10% Puntuación base' },
+            { id: 'emerald', name: 'Espectro Matrix', primary: '#10b981', glow: '#34d399', trail: 'rgba(16,185,129,0.5)', currency: 'coins', price: 1500, perk: '+15% Ingresos Tycoon' },
+            { id: 'gold', name: 'Soberano Dorado', primary: '#facc15', glow: '#fef08a', trail: 'rgba(250,204,21,0.6)', currency: 'gems', price: 40, perk: '+25% Monedas en pista' },
+            { id: 'omega', name: 'Omega Singularidad', primary: '#d946ef', glow: '#f0abfc', trail: 'rgba(217,70,239,0.7)', currency: 'gems', price: 90, perk: 'Escudo inicial + 2x Combo' }
+        ];
+
+        const UPGRADES_CATALOG = [
+            { id: 'magnet', name: 'Imán de Créditos', desc: 'Atrae monedas cercanas automáticamente.', icon: '🧲', maxLevel: 5, baseCost: 250 },
+            { id: 'multiplier', name: 'Chip Multiplicador', desc: 'Aumenta los puntos ganados por segundo.', icon: '✖️', maxLevel: 5, baseCost: 350 },
+            { id: 'tycoon', name: 'Servidor Tycoon Pasivo', desc: 'Genera monedas automáticamente cada segundo.', icon: '🏢', maxLevel: 5, baseCost: 400 },
+            { id: 'shield', name: 'Núcleo Escudo Aegis', desc: 'Extiende la duración del escudo protector.', icon: '🛡️', maxLevel: 5, baseCost: 300 }
+        ];
+
+        const BATTLE_PASS_TIERS = [
+            { level: 1, xpReq: 100, freeReward: '300 ₵', proReward: '15 💎', freeType: 'coins', freeVal: 300, proType: 'gems', proVal: 15 },
+            { level: 2, xpReq: 300, freeReward: '600 ₵', proReward: '1,200 ₵', freeType: 'coins', freeVal: 600, proType: 'coins', proVal: 1200 },
+            { level: 3, xpReq: 600, freeReward: '10 💎', proReward: '35 💎', freeType: 'gems', freeVal: 10, proType: 'gems', proVal: 35 },
+            { level: 4, xpReq: 1000, freeReward: '1,500 ₵', proReward: '50 💎 + VIP', freeType: 'coins', freeVal: 1500, proType: 'gems', proVal: 50 }
+        ];
+
+        const STORE_PACKAGES = [
+            { id: 'pack_gems_s', title: 'Puñado de Gemas', amountText: '50 💎', price: '$1.99 USD', type: 'gems', amount: 50, badge: 'INICIAL', color: 'from-fuchsia-600 to-purple-700' },
+            { id: 'pack_gems_m', title: 'Cofre Cyber-Gemas', amountText: '180 💎', price: '$4.99 USD', type: 'gems', amount: 180, badge: 'POPULAR', color: 'from-cyan-500 to-blue-700' },
+            { id: 'pack_coins_l', title: 'Bóveda Megacorporación', amountText: '10,000 ₵', price: '$3.99 USD', type: 'coins', amount: 10000, badge: 'OFERTA', color: 'from-amber-500 to-orange-600' },
+            { id: 'pack_vip', title: 'MEMBRESÍA NEON VIP', amountText: '2x Monedas Permanentes + 100 💎', price: '$7.99 USD', type: 'vip', amount: 100, badge: 'MEJOR VALOR', color: 'from-emerald-500 to-teal-700' }
+        ];
+
+        const defaultSave = {
+            coins: 500,
+            gems: 25,
+            highScore: 0,
+            vip: false,
+            proPass: false,
+            passXP: 0,
+            claimedFreePass: [],
+            claimedProPass: [],
+            ownedSkins: ['v1'],
+            equippedSkin: 'v1',
+            upgrades: { magnet: 1, multiplier: 1, tycoon: 1, shield: 1 },
+            tycoonBank: 0,
+            missions: [
+                { id: 'm1', title: 'Recolecta 50 monedas en pista', target: 50, progress: 0, reward: 300, claimed: false },
+                { id: 'm2', title: 'Alcanza 1,500 puntos en una carrera', target: 1500, progress: 0, reward: 500, claimed: false },
+                { id: 'm3', title: 'Consigue un combo x10', target: 10, progress: 0, reward: 15, isGems: true, claimed: false }
+            ]
+        };
+
+        let playerData = JSON.parse(localStorage.getItem('neon_overdrive_save')) || JSON.parse(JSON.stringify(defaultSave));
+
+        function saveGame() {
+            localStorage.setItem('neon_overdrive_save', JSON.stringify(playerData));
+            updateAllHUD();
+        }
+
+        // =========================================================================
+        // 3. MOTOR DEL JUEGO EN CANVAS (NEON ARCADE RUNNER)
+        // =========================================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'MENU'; // 'MENU' | 'PLAYING' | 'PAUSED' | 'GAMEOVER'
+        let width = 0, height = 0;
+
+        const game = {
+            lane: 1, // 0: Izquierda, 1: Centro, 2: Derecha
+            playerX: 0,
+            speed: 480,
+            baseSpeed: 480,
+            score: 0,
+            runCoins: 0,
+            combo: 1,
+            comboTimer: 0,
+            shieldTime: 0,
+            magnetTime: 0,
+            gridOffset: 0,
+            shakeTime: 0,
+            revivedThisRun: false,
+            doubledThisRun: false,
+            obstacles: [],
+            collectibles: [],
+            particles: [],
+            trail: [],
+            spawnTimer: 0,
+            coinSpawnTimer: 0
+        };
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width * window.devicePixelRatio;
+            canvas.height = height * window.devicePixelRatio;
+            ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function getTrackMetrics() {
+            const trackWidth = Math.min(width * 0.88, 460);
+            const trackLeft = (width - trackWidth) / 2;
+            const laneWidth = trackWidth / 3;
+            return { trackWidth, trackLeft, laneWidth };
+        }
+
+        function getActiveSkinObj() {
+            return SKINS_CATALOG.find(s => s.id === playerData.equippedSkin) || SKINS_CATALOG[0];
+        }
+
+        function startGame() {
+            SoundFX.init();
+            SoundFX.powerup();
+
+            const skin = getActiveSkinObj();
+            gameState = 'PLAYING';
+            game.lane = 1;
+            const { trackLeft, laneWidth } = getTrackMetrics();
+            game.playerX = trackLeft + laneWidth * 1.5;
+            game.speed = 480;
+            game.score = 0;
+            game.runCoins = 0;
+            game.combo = skin.id === 'omega' ? 2 : 1;
+            game.comboTimer = 0;
+            game.shieldTime = skin.id === 'omega' ? 6 : 0;
+            game.magnetTime = 0;
+            game.revivedThisRun = false;
+            game.doubledThisRun = false;
+            game.obstacles = [];
+            game.collectibles = [];
+            game.particles = [];
+            game.trail = [];
+            game.spawnTimer = 0;
+            game.coinSpawnTimer = 0;
+
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('screen-gameover').classList.add('hidden');
+            document.getElementById('screen-pause').classList.add('hidden');
+            document.getElementById('hud-gameplay-stats').classList.remove('hidden');
+            document.getElementById('btn-pause').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+        }
+
+        function revivePlayer() {
+            gameState = 'PLAYING';
+            game.revivedThisRun = true;
+            game.shieldTime = 4.5;
+            game.obstacles = []; // Limpia obstáculos cercanos
+            game.shakeTime = 0.2;
+            SoundFX.powerup();
+
+            document.getElementById('screen-gameover').classList.add('hidden');
+            document.getElementById('hud-gameplay-stats').classList.remove('hidden');
+            document.getElementById('btn-pause').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+            showToast('¡Sistema restaurado con Escudo Temporal!', 'success');
+        }
+
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            SoundFX.crash();
+            game.shakeTime = 0.4;
+            spawnExplosion(game.playerX, height - 120, '#f43f5e', 35);
+
+            const finalScore = Math.floor(game.score);
+            const earnedXP = Math.max(15, Math.floor(finalScore / 40) + game.runCoins * 2);
+
+            playerData.coins += game.runCoins;
+            playerData.passXP += earnedXP;
+            if (finalScore > playerData.highScore) {
+                playerData.highScore = finalScore;
+            }
+
+            // Actualizar misión de puntuación
+            updateMissionProgress('m2', finalScore, true);
+            saveGame();
+
+            document.getElementById('hud-gameplay-stats').classList.add('hidden');
+            document.getElementById('btn-pause').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+
+            document.getElementById('go-score').textContent = finalScore.toLocaleString();
+            document.getElementById('go-coins').textContent = `+${game.runCoins} ₵`;
+            document.getElementById('go-highscore').textContent = playerData.highScore.toLocaleString();
+            document.getElementById('go-xp').textContent = `+${earnedXP} XP`;
+
+            const reviveBtn = document.getElementById('btn-revive-ad');
+            if (game.revivedThisRun) {
+                reviveBtn.classList.add('hidden');
+            } else {
+                reviveBtn.classList.remove('hidden');
+            }
+
+            const doubleBtn = document.getElementById('btn-double-coins-ad');
+            if (game.runCoins > 0 && !game.doubledThisRun) {
+                doubleBtn.classList.remove('hidden');
+            } else {
+                doubleBtn.classList.add('hidden');
+            }
+
+            document.getElementById('screen-gameover').classList.remove('hidden');
+        }
+
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('screen-pause').classList.remove('hidden');
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                document.getElementById('screen-pause').classList.add('hidden');
+            }
+        }
+
+        function quitToMenu() {
+            gameState = 'MENU';
+            document.getElementById('screen-pause').classList.add('hidden');
+            document.getElementById('screen-gameover').classList.add('hidden');
+            document.getElementById('hud-gameplay-stats').classList.add('hidden');
+            document.getElementById('btn-pause').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+            document.getElementById('screen-menu').classList.remove('hidden');
+            updateAllHUD();
+        }
+
+        function moveLane(dir) {
+            if (gameState !== 'PLAYING') return;
+            const nextLane = Math.max(0, Math.min(2, game.lane + dir));
+            if (nextLane !== game.lane) {
+                game.lane = nextLane;
+                SoundFX.move();
+                spawnExplosion(game.playerX, height - 110, getActiveSkinObj().glow, 8);
+            }
+        }
+
+        // Controles de Teclado
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') moveLane(-1);
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') moveLane(1);
+            if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+                if (gameState === 'PLAYING' || gameState === 'PAUSED') togglePause();
+            }
+            if (e.key === ' ' && gameState === 'MENU') startGame();
+        });
+
+        // Controles Deslizantes Táctiles (Swipe)
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (gameState !== 'PLAYING') return;
+            const touchEndX = e.changedTouches[0].clientX;
+            const diffX = touchEndX - touchStartX;
+            if (Math.abs(diffX) > 28) {
+                moveLane(diffX > 0 ? 1 : -1);
+            } else {
+                // Toque simple en mitad izquierda o derecha de pantalla
+                moveLane(touchEndX < width / 2 ? -1 : 1);
+            }
+        }, { passive: true });
+
+        // Partículas
+        function spawnExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const spd = Math.random() * 240 + 60;
+                game.particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    life: 1,
+                    decay: Math.random() * 1.8 + 1.2,
+                    color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        // Actualización Lógica por Frame
+        function updateGame(dt) {
+            const { trackLeft, laneWidth } = getTrackMetrics();
+            const targetX = trackLeft + laneWidth * (game.lane + 0.5);
+            game.playerX += (targetX - game.playerX) * Math.min(1, dt * 18);
+
+            if (game.shakeTime > 0) game.shakeTime -= dt;
+
+            // Fondo animado incluso en Menú
+            const currentSpeed = gameState === 'PLAYING' ? game.speed : 220;
+            game.gridOffset = (game.gridOffset + currentSpeed * dt) % 60;
+
+            // Actualizar partículas
+            for (let i = game.particles.length - 1; i >= 0; i--) {
+                const p = game.particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= p.decay * dt;
+                if (p.life <= 0) game.particles.splice(i, 1);
+            }
+
+            if (gameState !== 'PLAYING') return;
+
+            // Incrementar dificultad y puntuación
+            game.speed = Math.min(1150, game.speed + dt * 14);
+            const skin = getActiveSkinObj();
+            const multUpgrade = 1 + (playerData.upgrades.multiplier - 1) * 0.25;
+            const skinBonus = skin.id === 'crimson' ? 1.1 : 1;
+            game.score += (game.speed * 0.045) * game.combo * multUpgrade * skinBonus * dt;
+
+            // Temporizadores de habilidades
+            if (game.shieldTime > 0) game.shieldTime -= dt;
+            if (game.magnetTime > 0) game.magnetTime -= dt;
+            if (game.combo > 1) {
+                game.comboTimer -= dt;
+                if (game.comboTimer <= 0) {
+                    game.combo = skin.id === 'omega' ? 2 : 1;
+                }
+            }
+
+            // Estela de la nave
+            game.trail.push({ x: game.playerX, y: height - 105, alpha: 0.85 });
+            for (let i = game.trail.length - 1; i >= 0; i--) {
+                game.trail[i].y += game.speed * 0.65 * dt;
+                game.trail[i].alpha -= dt * 3.2;
+                if (game.trail[i].alpha <= 0) game.trail.splice(i, 1);
+            }
+
+            // Generación de Obstáculos (Barreras Láser / Bloques)
+            game.spawnTimer -= dt;
+            if (game.spawnTimer <= 0) {
+                const interval = Math.max(0.42, 1.15 - (game.speed - 480) / 850);
+                game.spawnTimer = interval;
+
+                // Dejar siempre al menos 1 carril libre
+                const blockedCount = Math.random() < 0.38 ? 2 : 1;
+                const lanes = [0, 1, 2].sort(() => Math.random() - 0.5);
+                for (let i = 0; i < blockedCount; i++) {
+                    game.obstacles.push({
+                        lane: lanes[i],
+                        y: -50,
+                        w: laneWidth * 0.72,
+                        h: 34,
+                        type: Math.random() < 0.5 ? 'barrier' : 'drone'
+                    });
+                }
+            }
+
+            // Generación de Monedas y Power-Ups
+            game.coinSpawnTimer -= dt;
+            if (game.coinSpawnTimer <= 0) {
+                game.coinSpawnTimer = 0.26;
+                const lane = Math.floor(Math.random() * 3);
+                const roll = Math.random();
+                let itemType = 'coin';
+                if (roll < 0.04) itemType = 'shield';
+                else if (roll < 0.08) itemType = 'magnet';
+                else if (roll < 0.10) itemType = 'gem';
+
+                game.collectibles.push({
+                    lane,
+                    x: trackLeft + laneWidth * (lane + 0.5),
+                    y: -30,
+                    type: itemType
+                });
+            }
+
+            const playerY = height - 115;
+            const playerRadius = 20;
+
+            // Mover y verificar colisión con Obstáculos
+            for (let i = game.obstacles.length - 1; i >= 0; i--) {
+                const obs = game.obstacles[i];
+                obs.y += game.speed * dt;
+                const obsX = trackLeft + laneWidth * (obs.lane + 0.5);
+
+                if (Math.abs(obsX - game.playerX) < (obs.w * 0.45 + playerRadius * 0.7) &&
+                    Math.abs(obs.y - playerY) < (obs.h * 0.5 + playerRadius * 0.7)) {
+                    if (game.shieldTime > 0) {
+                        game.shieldTime = 0;
+                        SoundFX.shieldBreak();
+                        spawnExplosion(obsX, obs.y, '#38bdf8', 25);
+                        game.obstacles.splice(i, 1);
+                        showToast('¡Escudo Aegis absorbió el impacto!', 'info');
+                        continue;
+                    } else {
+                        triggerGameOver();
+                        return;
+                    }
+                }
+
+                if (obs.y > height + 60) {
+                    game.obstacles.splice(i, 1);
+                }
+            }
+
+            // Mover y recoger Monedas / Power-Ups
+            const magnetRange = 90 + playerData.upgrades.magnet * 55;
+            for (let i = game.collectibles.length - 1; i >= 0; i--) {
+                const item = game.collectibles[i];
+                item.y += game.speed * dt;
+
+                // Atracción por imán activo o mejora pasiva
+                const targetItemX = trackLeft + laneWidth * (item.lane + 0.5);
+                if (item.x === undefined) item.x = targetItemX;
+
+                const dx = game.playerX - item.x;
+                const dy = playerY - item.y;
+                const dist = Math.hypot(dx, dy);
+
+                if ((game.magnetTime > 0 || playerData.upgrades.magnet > 1) && item.type === 'coin' && dist < magnetRange) {
+                    item.x += (dx / dist) * 650 * dt;
+                    item.y += (dy / dist) * 650 * dt;
+                } else {
+                    item.x = targetItemX;
+                }
+
+                if (dist < playerRadius + 18) {
+                    if (item.type === 'coin') {
+                        const vipMult = playerData.vip ? 2 : 1;
+                        const skinCoinMult = skin.id === 'gold' ? 1.25 : 1;
+                        const gained = Math.round(1 * vipMult * skinCoinMult);
+                        game.runCoins += gained;
+                        game.combo = Math.min(25, game.combo + 1);
+                        game.comboTimer = 2.6;
+                        SoundFX.coin(game.combo);
+                        spawnExplosion(item.x, item.y, '#facc15', 7);
+                        updateMissionProgress('m1', gained, false);
+                        updateMissionProgress('m3', game.combo, true);
+                    } else if (item.type === 'gem') {
+                        playerData.gems += 1;
+                        SoundFX.powerup();
+                        spawnExplosion(item.x, item.y, '#e879f9', 16);
+                        showToast('+1 Gema recolectada en pista 💎', 'success');
+                    } else if (item.type === 'shield') {
+                        game.shieldTime = 5 + playerData.upgrades.shield * 1.2;
+                        SoundFX.powerup();
+                        spawnExplosion(item.x, item.y, '#38bdf8', 16);
+                        showToast('🛡️ Escudo Aegis Activado', 'info');
+                    } else if (item.type === 'magnet') {
+                        game.magnetTime = 6 + playerData.upgrades.magnet * 1.2;
+                        SoundFX.powerup();
+                        spawnExplosion(item.x, item.y, '#f43f5e', 16);
+                        showToast('🧲 Super Imán de Créditos Activado', 'info');
+                    }
+                    game.collectibles.splice(i, 1);
+                    continue;
+                }
+
+                if (item.y > height + 50) {
+                    game.collectibles.splice(i, 1);
+                }
+            }
+
+            // Actualizar HUD en tiempo real
+            document.getElementById('hud-score').textContent = Math.floor(game.score).toLocaleString();
+            document.getElementById('hud-combo').textContent = `x${game.combo}`;
+            document.getElementById('hud-coins').textContent = (playerData.coins + game.runCoins).toLocaleString();
+        }
+
+        // Renderizado Visual Neón
+        function drawGame() {
+            ctx.save();
+
+            // Efecto de temblor de cámara al chocar
+            if (game.shakeTime > 0) {
+                const mag = game.shakeTime * 22;
+                ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag);
+            }
+
+            // 1. Fondo Espacial Cyberpunk
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+            bgGrad.addColorStop(0, '#04050c');
+            bgGrad.addColorStop(0.5, '#0b0e23');
+            bgGrad.addColorStop(1, '#140c29');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Horizonte Neón
+            const { trackWidth, trackLeft, laneWidth } = getTrackMetrics();
+            ctx.fillStyle = 'rgba(12, 16, 36, 0.9)';
+            ctx.fillRect(trackLeft, 0, trackWidth, height);
+
+            // Líneas horizontales de velocidad (Grid)
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.14)';
+            ctx.lineWidth = 1;
+            for (let y = game.gridOffset; y < height; y += 60) {
+                ctx.beginPath();
+                ctx.moveTo(trackLeft, y);
+                ctx.lineTo(trackLeft + trackWidth, y);
+                ctx.stroke();
+            }
+
+            // Divisores de carriles
+            ctx.strokeStyle = 'rgba(236, 72, 153, 0.25)';
+            ctx.setLineDash([18, 18]);
+            ctx.lineDashOffset = -game.gridOffset;
+            for (let i = 1; i <= 2; i++) {
+                const lx = trackLeft + laneWidth * i;
+                ctx.beginPath();
+                ctx.moveTo(lx, 0);
+                ctx.lineTo(lx, height);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            // Bordes exteriores luminosos de la autopista
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = '#06b6d4';
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(trackLeft, 0);
+            ctx.lineTo(trackLeft, height);
+            ctx.moveTo(trackLeft + trackWidth, 0);
+            ctx.lineTo(trackLeft + trackWidth, height);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // 2. Coleccionables (Monedas, Gemas, Power-Ups)
+            game.collectibles.forEach(item => {
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                if (item.type === 'coin') {
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = '#facc15';
+                    ctx.fillStyle = '#facc15';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#713f12';
+                    ctx.font = 'bold 12px Orbitron';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('₵', 0, 1);
+                } else if (item.type === 'gem') {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#e879f9';
+                    ctx.fillStyle = '#e879f9';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -14);
+                    ctx.lineTo(12, 0);
+                    ctx.lineTo(0, 14);
+                    ctx.lineTo(-12, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (item.type === 'shield') {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#38bdf8';
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillStyle = '#bae6fd';
+                    ctx.font = '13px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🛡', 0, 1);
+                } else if (item.type === 'magnet') {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#fb7185';
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '13px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🧲', 0, 1);
+                }
+                ctx.restore();
+            });
+
+            // 3. Obstáculos Láser
+            game.obstacles.forEach(obs => {
+                const ox = trackLeft + laneWidth * (obs.lane + 0.5);
+                ctx.save();
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = '#f43f5e';
+                ctx.fillStyle = '#be123c';
+                ctx.strokeStyle = '#fda4af';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(ox - obs.w / 2, obs.y - obs.h / 2, obs.w, obs.h, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                // Franja central brillante
+                ctx.fillStyle = '#ffe4e6';
+                ctx.fillRect(ox - obs.w * 0.38, obs.y - 3, obs.w * 0.76, 6);
+                ctx.restore();
+            });
+
+            // 4. Estela y Nave del Jugador
+            const skin = getActiveSkinObj();
+            const px = game.playerX;
+            const py = gameState === 'MENU' ? height * 0.44 : height - 115;
+
+            // Dibujar estela
+            game.trail.forEach(t => {
+                ctx.fillStyle = skin.trail;
+                ctx.globalAlpha = Math.max(0, t.alpha * 0.5);
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, 10 * t.alpha, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            // Dibujar Nave Cyber-Runner
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.shadowBlur = 22;
+            ctx.shadowColor = skin.glow;
+
+            // Fuselaje principal triangular futurista
+            ctx.fillStyle = skin.primary;
+            ctx.beginPath();
+            ctx.moveTo(0, -28);
+            ctx.lineTo(22, 20);
+            ctx.lineTo(0, 11);
+            ctx.lineTo(-22, 20);
+            ctx.closePath();
+            ctx.fill();
+
+            // Cabina luminosa
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(0, -12);
+            ctx.lineTo(7, 5);
+            ctx.lineTo(-7, 5);
+            ctx.closePath();
+            ctx.fill();
+
+            // Propulsores
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(-9, 20, 4 + Math.random() * 2, 0, Math.PI * 2);
+            ctx.arc(9, 20, 4 + Math.random() * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Aura de Escudo activo
+            if (game.shieldTime > 0) {
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, 34, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 5. Partículas de Explosión / Efectos
+            game.particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            ctx.restore();
+        }
+
+        // Bucle Principal
+        let lastTime = performance.now();
+        function gameLoop(now) {
+            const dt = Math.min(0.05, (now - lastTime) / 1000);
+            lastTime = now;
+
+            updateGame(dt);
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // =========================================================================
+        // 4. ECONOMÍA TYCOON PASIVA Y MISIONES DIARIAS
+        // =========================================================================
+        setInterval(() => {
+            const incomePerSec = playerData.upgrades.tycoon * 3 * (getActiveSkinObj().id === 'emerald' ? 1.15 : 1);
+            playerData.tycoonBank = Math.min(5000, playerData.tycoonBank + incomePerSec);
+            const pending = Math.floor(playerData.tycoonBank);
+            document.getElementById('hud-tycoon-pending').textContent = `+${pending} ₵`;
+            document.getElementById('mobile-tycoon-pending').textContent = `+${pending} ₵`;
+        }, 1000);
+
+        function collectTycoonIncome() {
+            const amount = Math.floor(playerData.tycoonBank);
+            if (amount <= 0) {
+                showToast('El Servidor Tycoon aún está minando créditos...', 'info');
+                return;
+            }
+            playerData.coins += amount;
+            playerData.tycoonBank = 0;
+            SoundFX.buy();
+            saveGame();
+            showToast(`⚡ Recolectados +${amount} ₵ de tu Nodo Tycoon`, 'success');
+        }
+
+        function updateMissionProgress(missionId, value, isAbsolute = false) {
+            const m = playerData.missions.find(item => item.id === missionId);
+            if (!m || m.claimed) return;
+            if (isAbsolute) {
+                m.progress = Math.max(m.progress, value);
+            } else {
+                m.progress += value;
+            }
+            checkMissionNotifications();
+        }
+
+        function checkMissionNotifications() {
+            const hasReady = playerData.missions.some(m => !m.claimed && m.progress >= m.target);
+            const dot = document.getElementById('mission-dot');
+            if (hasReady) dot.classList.remove('hidden');
+            else dot.classList.add('hidden');
+        }
+
+        function updateAllHUD() {
+            document.getElementById('hud-coins').textContent = Math.floor(playerData.coins).toLocaleString();
+            document.getElementById('hud-gems').textContent = playerData.gems.toLocaleString();
+            document.getElementById('menu-highscore').textContent = playerData.highScore.toLocaleString();
+            document.getElementById('menu-active-skin').textContent = getActiveSkinObj().name;
+            document.getElementById('menu-vip-badge').textContent = playerData.vip ? '👑 MIEMBRO VIP (2x)' : 'Cuenta Estándar';
+            checkMissionNotifications();
+        }
+
+        // =========================================================================
+        // 5. MODALES DE TIENDA, MEJORAS, PASE DE BATALLA Y FACTURACIÓN SIMULADA
+        // =========================================================================
+        let currentModalTab = '';
+        let pendingCheckoutPackage = null;
+
+        function openModal(tab) {
+            SoundFX.init();
+            currentModalTab = tab;
+            const backdrop = document.getElementById('modal-backdrop');
+            const title = document.getElementById('modal-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            const icon = document.getElementById('modal-icon');
+            const body = document.getElementById('modal-body');
+
+            backdrop.classList.remove('hidden');
+            body.innerHTML = '';
+
+            if (tab === 'garage') {
+                icon.textContent = '🚀';
+                title.textContent = 'GARAJE DE NAVES & SKINS';
+                subtitle.textContent = 'Desbloquea naves con habilidades únicas para dominar la pista';
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+
+                SKINS_CATALOG.forEach(skin => {
+                    const owned = playerData.ownedSkins.includes(skin.id);
+                    const equipped = playerData.equippedSkin === skin.id;
+                    const priceLabel = skin.currency === 'gems' ? `${skin.price} 💎` : `${skin.price} ₵`;
+
+                    const card = document.createElement('div');
+                    card.className = `p-4 rounded-2xl border ${equipped ? 'border-cyan-400 bg-cyan-950/30' : 'border-slate-800 bg-slate-950/70'} flex flex-col justify-between gap-3`;
+                    card.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg" style="background: ${skin.primary}22; border: 2px solid ${skin.primary}">
+                                <div class="w-5 h-5 rotate-45" style="background: ${skin.primary}; box-shadow: 0 0 12px ${skin.glow}"></div>
+                            </div>
+                            <div>
+                                <h4 class="font-display font-bold text-sm text-white">${skin.name}</h4>
+                                <p class="text-xs text-emerald-400 font-semibold">${skin.perk}</p>
+                            </div>
+                        </div>
+                        <button onclick="handleSkinAction('${skin.id}')" class="btn-arcade w-full py-2.5 rounded-xl font-display font-bold text-xs tracking-wider ${
+                            equipped ? 'bg-cyan-600/30 text-cyan-200 border border-cyan-400/50' :
+                            owned ? 'bg-slate-800 hover:bg-slate-700 text-white' :
+                            skin.currency === 'gems' ? 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white' : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                        }">
+                            ${equipped ? '✓ EQUIPADA' : owned ? 'EQUIPAR NAVE' : `DESBLOQUEAR (${priceLabel})`}
+                        </button>
+                    `;
+                    grid.appendChild(card);
+                });
+                body.appendChild(grid);
+
+            } else if (tab === 'upgrades') {
+                icon.textContent = '⚡';
+                title.textContent = 'MEJORAS PERMANENTES & TYCOON';
+                subtitle.textContent = 'Invierte tus monedas para escalar tus ganancias y poder';
+
+                UPGRADES_CATALOG.forEach(upg => {
+                    const lvl = playerData.upgrades[upg.id];
+                    const isMax = lvl >= upg.maxLevel;
+                    const cost = upg.baseCost * lvl;
+
+                    const row = document.createElement('div');
+                    row.className = 'p-4 rounded-2xl bg-slate-950/75 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+                    row.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-2xl">${upg.icon}</div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-display font-bold text-sm text-white">${upg.name}</h4>
+                                    <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">NV. ${lvl}/${upg.maxLevel}</span>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-0.5">${upg.desc}</p>
+                            </div>
+                        </div>
+                        <button onclick="buyUpgrade('${upg.id}')" ${isMax ? 'disabled' : ''} class="btn-arcade px-4 py-2.5 rounded-xl font-display font-bold text-xs tracking-wider shrink-0 ${
+                            isMax ? 'bg-slate-800 text-slate-400' : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                        }">
+                            ${isMax ? 'MÁXIMO' : `MEJORAR (${cost} ₵)`}
+                        </button>
+                    `;
+                    body.appendChild(row);
+                });
+
+            } else if (tab === 'battlepass') {
+                icon.textContent = '🏆';
+                title.textContent = 'PASE DE BATALLA: TEMPORADA NEÓN';
+                subtitle.textContent = `Tu XP Actual: ${playerData.passXP} XP • Gana XP jugando carreras`;
+
+                if (!playerData.proPass) {
+                    const banner = document.createElement('div');
+                    banner.className = 'p-4 rounded-2xl bg-gradient-to-r from-pink-900/60 via-purple-900/60 to-indigo-900/60 border border-pink-500/50 flex flex-col sm:flex-row items-center justify-between gap-3';
+                    banner.innerHTML = `
+                        <div>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-pink-300">Desbloqueo Premium</span>
+                            <h4 class="font-display font-bold text-base text-white">ACTIVAR PASE PRO (+100 💎 al instante)</h4>
+                            <p class="text-xs text-slate-300">Desbloquea la fila inferior de recompensas exclusivas.</p>
+                        </div>
+                        <button onclick="activateProPass()" class="btn-arcade px-4 py-2.5 rounded-xl bg-pink-500 hover:bg-pink-400 text-white font-display font-black text-xs shrink-0 shadow-lg">
+                            ACTIVAR (60 💎)
+                        </button>
+                    `;
+                    body.appendChild(banner);
+                }
+
+                BATTLE_PASS_TIERS.forEach(tier => {
+                    const unlocked = playerData.passXP >= tier.xpReq;
+                    const freeClaimed = playerData.claimedFreePass.includes(tier.level);
+                    const proClaimed = playerData.claimedProPass.includes(tier.level);
+
+                    const card = document.createElement('div');
+                    card.className = `p-3.5 rounded-2xl border ${unlocked ? 'border-cyan-500/40 bg-slate-900/80' : 'border-slate-800 bg-slate-950/60 opacity-75'} grid grid-cols-3 items-center gap-2 text-center`;
+                    card.innerHTML = `
+                        <div class="text-left">
+                            <span class="font-display font-black text-sm text-cyan-300">NIVEL ${tier.level}</span>
+                            <span class="block text-[11px] text-slate-400">Requiere ${tier.xpReq} XP</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block mb-1">GRATIS</span>
+                            <button onclick="claimPassReward(${tier.level}, false)" ${(!unlocked || freeClaimed) ? 'disabled' : ''} class="btn-arcade w-full py-1.5 rounded-lg text-xs font-bold ${
+                                freeClaimed ? 'bg-slate-800 text-emerald-400' : unlocked ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-500'
+                            }">
+                                ${freeClaimed ? '✓ Reclamado' : tier.freeReward}
+                            </button>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-pink-400 font-bold block mb-1">PASE PRO</span>
+                            <button onclick="claimPassReward(${tier.level}, true)" ${(!unlocked || !playerData.proPass || proClaimed) ? 'disabled' : ''} class="btn-arcade w-full py-1.5 rounded-lg text-xs font-bold ${
+                                proClaimed ? 'bg-slate-800 text-emerald-400' : (unlocked && playerData.proPass) ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-500'
+                            }">
+                                ${proClaimed ? '✓ Reclamado' : `🔒 ${tier.proReward}`}
+                            </button>
+                        </div>
+                    `;
+                    body.appendChild(card);
+                });
+
+            } else if (tab === 'missions') {
+                icon.textContent = '📋';
+                title.textContent = 'MISIONES DIARIAS';
+                subtitle.textContent = 'Completa objetivos para ganar monedas y gemas gratis';
+
+                playerData.missions.forEach(m => {
+                    const pct = Math.min(100, Math.round((m.progress / m.target) * 100));
+                    const ready = m.progress >= m.target && !m.claimed;
+
+                    const card = document.createElement('div');
+                    card.className = 'p-4 rounded-2xl bg-slate-950/75 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+                    card.innerHTML = `
+                        <div class="flex-1">
+                            <div class="flex justify-between text-xs font-bold mb-1">
+                                <span class="text-white">${m.title}</span>
+                                <span class="text-cyan-300">${Math.min(m.progress, m.target)} / ${m.target}</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-cyan-400 to-amber-400" style="width: ${pct}%"></div>
+                            </div>
+                        </div>
+                        <button onclick="claimMission('${m.id}')" ${!ready ? 'disabled' : ''} class="btn-arcade px-4 py-2 rounded-xl font-display font-bold text-xs shrink-0 ${
+                            m.claimed ? 'bg-slate-800 text-emerald-400' : ready ? 'bg-amber-400 text-slate-950 animate-pulse' : 'bg-slate-800 text-slate-500'
+                        }">
+                            ${m.claimed ? '✓ COMPLETADA' : `RECLAMAR (+${m.reward} ${m.isGems ? '💎' : '₵'})`}
+                        </button>
+                    `;
+                    body.appendChild(card);
+                });
+
+            } else if (tab === 'bank') {
+                icon.textContent = '💎';
+                title.textContent = 'TIENDA DE RECARGA & FACTURACIÓN';
+                subtitle.textContent = 'Adquiere Gemas, Monedas y Membresía VIP (Simulación In-App)';
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3.5';
+
+                STORE_PACKAGES.forEach(pkg => {
+                    const card = document.createElement('div');
+                    card.className = `p-4 rounded-2xl bg-gradient-to-br ${pkg.color} border border-white/25 flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden`;
+                    card.innerHTML = `
+                        <div>
+                            <span class="inline-block px-2 py-0.5 rounded bg-black/40 text-[10px] font-black tracking-widest text-white mb-1">${pkg.badge}</span>
+                            <h4 class="font-display font-black text-base text-white">${pkg.title}</h4>
+                            <p class="font-display font-bold text-lg text-amber-200 mt-1">${pkg.amountText}</p>
+                        </div>
+                        <button onclick="openCheckout('${pkg.id}')" class="btn-arcade w-full py-2.5 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-white font-display font-black text-xs tracking-wider border border-white/20">
+                            COMPRAR • ${pkg.price}
+                        </button>
+                    `;
+                    grid.appendChild(card);
+                });
+                body.appendChild(grid);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-backdrop').classList.add('hidden');
+        }
+
+        // Acciones dentro de los Modales
+        function handleSkinAction(skinId) {
+            const skin = SKINS_CATALOG.find(s => s.id === skinId);
+            if (!skin) return;
+
+            if (playerData.ownedSkins.includes(skinId)) {
+                playerData.equippedSkin = skinId;
+                SoundFX.move();
+                saveGame();
+                openModal('garage');
+                showToast(`Nave "${skin.name}" equipada.`, 'success');
+                return;
+            }
+
+            if (skin.currency === 'coins') {
+                if (playerData.coins < skin.price) {
+                    showToast('Monedas insuficientes. ¡Juega o visita la tienda!', 'warning');
+                    return;
+                }
+                playerData.coins -= skin.price;
+            } else {
+                if (playerData.gems < skin.price) {
+                    showToast('Gemas insuficientes. ¡Recarga en la Tienda!', 'warning');
+                    openModal('bank');
+                    return;
+                }
+                playerData.gems -= skin.price;
+            }
+
+            playerData.ownedSkins.push(skinId);
+            playerData.equippedSkin = skinId;
+            SoundFX.buy();
+            saveGame();
+            openModal('garage');
+            showToast(`¡Nueva nave desbloqueada: ${skin.name}!`, 'success');
+        }
+
+        function buyUpgrade(upgId) {
+            const upg = UPGRADES_CATALOG.find(u => u.id === upgId);
+            const lvl = playerData.upgrades[upgId];
+            if (lvl >= upg.maxLevel) return;
+
+            const cost = upg.baseCost * lvl;
+            if (playerData.coins < cost) {
+                showToast('No tienes suficientes monedas para esta mejora.', 'warning');
+                return;
+            }
+
+            playerData.coins -= cost;
+            playerData.upgrades[upgId]++;
+            SoundFX.buy();
+            saveGame();
+            openModal('upgrades');
+            showToast(`¡${upg.name} subió a Nivel ${playerData.upgrades[upgId]}!`, 'success');
+        }
+
+        function activateProPass() {
+            if (playerData.gems < 60) {
+                showToast('Necesitas 60 💎 para activar el Pase Pro.', 'warning');
+                openModal('bank');
+                return;
+            }
+            playerData.gems -= 60;
+            playerData.proPass = true;
+            SoundFX.buy();
+            saveGame();
+            openModal('battlepass');
+            showToast('🏆 ¡Pase de Batalla PRO activado!', 'success');
+        }
+
+        function claimPassReward(level, isPro) {
+            const tier = BATTLE_PASS_TIERS.find(t => t.level === level);
+            if (!tier) return;
+
+            if (isPro) {
+                if (playerData.claimedProPass.includes(level)) return;
+                playerData.claimedProPass.push(level);
+                if (tier.proType === 'gems') playerData.gems += tier.proVal;
+                else playerData.coins += tier.proVal;
+            } else {
+                if (playerData.claimedFreePass.includes(level)) return;
+                playerData.claimedFreePass.push(level);
+                if (tier.freeType === 'gems') playerData.gems += tier.freeVal;
+                else playerData.coins += tier.freeVal;
+            }
+            SoundFX.buy();
+            saveGame();
+            openModal('battlepass');
+            showToast('¡Recompensa del Pase de Batalla reclamada!', 'success');
+        }
+
+        function claimMission(id) {
+            const m = playerData.missions.find(item => item.id === id);
+            if (!m || m.claimed || m.progress < m.target) return;
+
+            m.claimed = true;
+            if (m.isGems) playerData.gems += m.reward;
+            else playerData.coins += m.reward;
+
+            SoundFX.buy();
+            saveGame();
+            openModal('missions');
+            showToast(`¡Misión completada! +${m.reward} ${m.isGems ? '💎' : '₵'}`, 'success');
+        }
+
+        // =========================================================================
+        // 6. SIMULADOR DE FACTURACIÓN IN-APP & ANUNCIOS RECOMPENSADOS
+        // =========================================================================
+        function openCheckout(pkgId) {
+            const pkg = STORE_PACKAGES.find(p => p.id === pkgId);
+            if (!pkg) return;
+            pendingCheckoutPackage = pkg;
+            document.getElementById('checkout-item-name').textContent = `${pkg.title} (${pkg.amountText})`;
+            document.getElementById('checkout-item-price').textContent = pkg.price;
+            document.getElementById('checkout-overlay').classList.remove('hidden');
+        }
+
+        function closeCheckout() {
+            document.getElementById('checkout-overlay').classList.add('hidden');
+            pendingCheckoutPackage = null;
+        }
+
+        function confirmSimulatedPurchase() {
+            if (!pendingCheckoutPackage) return;
+            const pkg = pendingCheckoutPackage;
+
+            if (pkg.type === 'gems') {
+                playerData.gems += pkg.amount;
+            } else if (pkg.type === 'coins') {
+                playerData.coins += pkg.amount;
+            } else if (pkg.type === 'vip') {
+                playerData.vip = true;
+                playerData.gems += pkg.amount;
+            }
+
+            SoundFX.buy();
+            saveGame();
+            closeCheckout();
+            if (currentModalTab === 'bank') openModal('bank');
+            showToast(`✅ Facturación exitosa: ${pkg.title} acreditado.`, 'success');
+        }
+
+        // Anuncios Recompensados (Simulación de 3 segundos)
+        function watchRewardedAd(rewardType) {
+            SoundFX.init();
+            const overlay = document.getElementById('ad-overlay');
+            const bar = document.getElementById('ad-progress-bar');
+            const timerText = document.getElementById('ad-timer-text');
+
+            overlay.classList.remove('hidden');
+            bar.style.width = '0%';
+            let elapsed = 0;
+            const duration = 3000;
+
+            const interval = setInterval(() => {
+                elapsed += 100;
+                const pct = Math.min(100, (elapsed / duration) * 100);
+                bar.style.width = pct + '%';
+                const rem = Math.ceil((duration - elapsed) / 1000);
+                timerText.textContent = rem > 0 ? `Recompensa disponible en ${rem}s...` : '¡Recompensa lista!';
+
+                if (elapsed >= duration) {
+                    clearInterval(interval);
+                    overlay.classList.add('hidden');
+
+                    if (rewardType === 'coins') {
+                        playerData.coins += 250;
+                        SoundFX.buy();
+                        saveGame();
+                        showToast('🎬 ¡+250 ₵ acreditados por ver el anuncio!', 'success');
+                    } else if (rewardType === 'revive') {
+                        revivePlayer();
+                    } else if (rewardType === 'double_coins') {
+                        game.doubledThisRun = true;
+                        playerData.coins += game.runCoins;
+                        game.runCoins *= 2;
+                        document.getElementById('go-coins').textContent = `+${game.runCoins} ₵ (2x)`;
+                        document.getElementById('btn-double-coins-ad').classList.add('hidden');
+                        SoundFX.buy();
+                        saveGame();
+                        showToast('📺 ¡Monedas de la carrera duplicadas!', 'success');
+                    }
+                }
+            }, 100);
+        }
+
+        // Compartir Puntuación (Con fallback seguro sin alert)
+        function shareScore() {
+            const shareText = `🚀 ¡Logré ${playerData.highScore.toLocaleString()} puntos en NEON OVERDRIVE: Cyber Runner & Tycoon! ¿Puedes superar mi récord?`;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = shareText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('📋 ¡Récord copiado al portapapeles para compartir!', 'success');
+        }
+
+        // Sistema de Notificaciones Toast
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const styles = {
+                success: 'border-emerald-400/60 bg-slate-950/95 text-emerald-200',
+                warning: 'border-amber-400/60 bg-slate-950/95 text-amber-200',
+                info: 'border-cyan-400/60 bg-slate-950/95 text-cyan-200'
+            };
+            toast.className = `px-4 py-2 rounded-full border shadow-xl text-xs font-bold tracking-wide transition-all duration-300 transform -translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+            toast.textContent = msg;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('-translate-y-2', 'opacity-0');
+            });
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2600);
+        }
+
+        // =========================================================================
+        // 7. INICIALIZACIÓN AL CARGAR LA VENTANA
+        // =========================================================================
+        window.onload = function() {
+            updateAllHUD();
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
